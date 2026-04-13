@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>Alethea</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css"/>
+
+  <!-- jsQR — pure-JS QR decoder, works in every browser as a fallback -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+  <!-- qrcode.js — generates QR codes from a string on a canvas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════════════════
+     SPLASH
+════════════════════════════════════════════════════════════ -->
+<div id="splash-page">
+  <div class="splash-lines">
+    <div class="splash-line"></div>
+    <div class="splash-line"></div>
+    <div class="splash-line"></div>
+  </div>
+  <div class="splash-content">
+    <div class="splash-wordmark" id="splash-wordmark" aria-label="Alethea"></div>
+    <div class="splash-rule"    id="splash-rule"></div>
+    <div class="splash-tagline" id="splash-tagline">know the truth</div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     LOGIN PAGE
+════════════════════════════════════════════════════════════ -->
+<div id="login-page" style="display:none">
+  <div class="login-bg">
+    <div class="login-orb login-orb-1"></div>
+    <div class="login-orb login-orb-2"></div>
+  </div>
+
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="logo-mark">A</div>
+      <div class="logo-text">Ale<span>·</span>thea</div>
+    </div>
+    <h1 class="login-headline">Decentralised<br/>self-custody finance.</h1>
+    <p class="login-sub">Secure wallet · Jar nodes · Validator consensus</p>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" data-tab="signin">Sign In</button>
+      <button class="auth-tab"        data-tab="signup">Create Account</button>
+    </div>
+
+    <div id="auth-error" class="auth-error" style="display:none"></div>
+
+    <div id="signin-fields" class="auth-fields">
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input type="email"    class="form-input" id="signin-email"    placeholder="you@email.com"    autocomplete="email"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input type="password" class="form-input" id="signin-password" placeholder="Your password"    autocomplete="current-password"/>
+      </div>
+    </div>
+
+    <div id="signup-fields" class="auth-fields" style="display:none">
+      <div class="form-group">
+        <label class="form-label">Full Name</label>
+        <input type="text"     class="form-input" id="signup-name"     placeholder="Your name"        autocomplete="name"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input type="email"    class="form-input" id="signup-email"    placeholder="you@email.com"    autocomplete="email"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input type="password" class="form-input" id="signup-password" placeholder="Min 8 characters" autocomplete="new-password"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Confirm Password</label>
+        <input type="password" class="form-input" id="signup-confirm"  placeholder="Repeat password"  autocomplete="new-password"/>
+      </div>
+    </div>
+
+    <button class="btn-primary full-width mt-lg" id="signin-btn">
+      <span class="btn-text">Sign In</span>
+      <span class="btn-loading" style="display:none">Signing in…</span>
+    </button>
+    <button class="btn-primary full-width mt-lg" id="signup-btn" style="display:none">
+      <span class="btn-text">Create Account</span>
+      <span class="btn-loading" style="display:none">Creating account…</span>
+    </button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     SETUP PAGE
+════════════════════════════════════════════════════════════ -->
+<div id="setup-page" style="display:none">
+  <div class="setup-wrap">
+    <div class="login-logo">
+      <div class="logo-mark">A</div>
+      <div class="logo-text">Ale<span>·</span>thea</div>
+    </div>
+
+    <h2 class="setup-title">Secure Wallet Setup</h2>
+    <p class="setup-desc">
+      Your address is derived from your ECDSA P-256 public key —
+      SHA-256 of the raw key bytes, prefixed <code>0x</code>.
+      A backup JSON file will download automatically. Keep it safe.
+    </p>
+
+    <div id="setup-error" class="auth-error" style="display:none"></div>
+
+    <button class="btn-primary full-width mt-lg" id="generateKeysBtn">
+      <span class="btn-text">Generate Wallet</span>
+      <span class="btn-loading" style="display:none">Generating…</span>
+    </button>
+
+    <div id="walletDisplay" class="key-box" style="display:none">
+      <div class="key-box-label">Wallet Address</div>
+      <span id="walletAddressValue"></span>
+    </div>
+
+    <div id="jar-option" style="display:none">
+      <div class="setup-section-label">Jar Node Mode</div>
+      <div class="jar-toggle">
+        <label class="radio-row">
+          <input type="radio" name="distMode" value="auto" id="distAuto" checked/>
+          Auto-distribute · reclaim automatically
+        </label>
+        <label class="radio-row">
+          <input type="radio" name="distMode" value="manual" id="distManual"/>
+          Manual distribute · reclaim yourself
+        </label>
+        <label class="radio-row" style="margin-top:0.6rem">
+          <input type="checkbox" id="enableJarNodes"/>
+          Enable Jar Nodes (participate in consensus)
+        </label>
+      </div>
+    </div>
+
+    <div id="finalize-area" style="display:none">
+      <button class="btn-primary full-width mt-lg" id="completeSetupBtn">
+        <span class="btn-text">Complete Setup &amp; Enter</span>
+        <span class="btn-loading" style="display:none">Saving…</span>
+      </button>
+    </div>
+
+    <p class="setup-note">All keys are generated client-side · Never share your private key</p>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     APP
+════════════════════════════════════════════════════════════ -->
+<div id="app">
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark sm">A</div>
+      <div class="logo-text">Ale<span>·</span>thea</div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Wallet</div>
+      <a class="nav-item active" data-page="wallet">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M16 12h2"/></svg>
+        Wallet
+      </a>
+      <a class="nav-item" data-page="transactions">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>
+        Transactions
+      </a>
+
+      <div class="nav-section-label">Network</div>
+      <a class="nav-item" data-page="blockchain">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="2" width="8" height="8" rx="1"/><rect x="14" y="2" width="8" height="8" rx="1"/><rect x="2" y="14" width="8" height="8" rx="1"/><rect x="14" y="14" width="8" height="8" rx="1"/></svg>
+        Blockchain
+      </a>
+      <a class="nav-item" data-page="jarnodes">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>
+        Jar Nodes
+      </a>
+      <a class="nav-item" data-page="validator">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        Validator
+        <span class="nav-badge" id="validator-badge" style="display:none">!</span>
+      </a>
+
+      <div class="nav-section-label">Market</div>
+      <a class="nav-item" data-page="market">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+        Market
+      </a>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <div class="user-card" id="user-card">
+        <div class="user-avatar" id="user-avatar">A</div>
+        <div class="user-info">
+          <div class="user-name"  id="user-name">Loading…</div>
+          <div class="user-email" id="user-email"></div>
+        </div>
+        <button class="signout-icon-btn" id="signout-btn" title="Sign out">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="hamburger" id="hamburger">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6"  x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <div>
+          <div class="topbar-title"    id="topbar-title">Wallet</div>
+          <div class="topbar-subtitle" id="topbar-subtitle">Your ALE balance and activity</div>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <div class="topbar-addr" id="topbar-addr" title="Click to copy address">
+          <span id="topbar-addr-text">0x0000…0000</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ══════ WALLET ══════ -->
+    <section class="page active" id="page-wallet">
+      <div class="page-header">
+        <h1 class="page-title" id="wallet-greeting">Wallet</h1>
+        <p class="page-sub">Your ALE balance, send &amp; receive</p>
+      </div>
+
+      <!-- Balance card — copy + receive QR buttons side by side -->
+      <div class="balance-card">
+        <div class="balance-top">
+          <span class="balance-label">total balance</span>
+          <div style="display:flex;gap:0.5rem;align-items:center;">
+            <button class="copy-addr-btn" id="copyAddressBtn">copy address</button>
+            <!-- Receive QR: shows your address as a QR code -->
+            <button class="receive-qr-btn" id="openReceiveQR" title="Show my QR code">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <rect x="3" y="3" width="7" height="7" rx="1"/>
+                <rect x="14" y="3" width="7" height="7" rx="1"/>
+                <rect x="3" y="14" width="7" height="7" rx="1"/>
+                <rect x="14" y="14" width="3" height="3"/>
+                <rect x="18" y="18" width="3" height="3"/>
+                <rect x="14" y="18" width="3" height="3"/>
+                <rect x="18" y="14" width="3" height="3"/>
+              </svg>
+              receive
+            </button>
+          </div>
+        </div>
+        <div class="balance-row">
+          <span class="balance-value" id="walletBalance">0.0000</span>
+          <span class="balance-unit">ALE</span>
+        </div>
+        <div class="balance-breakdown" id="balanceBreakdown"></div>
+        <div class="balance-addr"><span id="walletAddressShort">0x0000…0000</span></div>
+      </div>
+
+      <div class="stats-grid four">
+        <div class="stat-card">
+          <div class="stat-label">Liquid</div>
+          <div class="stat-value acid" id="stat-liquid">0.0000</div>
+          <div class="stat-sub">spendable ALE</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">In Jars</div>
+          <div class="stat-value" id="stat-stored">0.0000</div>
+          <div class="stat-sub">stored chunks</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Pending Tx</div>
+          <div class="stat-value" id="stat-pending">0</div>
+          <div class="stat-sub">awaiting mine</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Chain Height</div>
+          <div class="stat-value" id="stat-blocks">—</div>
+          <div class="stat-sub">blocks mined</div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Send ALE</span>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <label class="form-label">Recipient Address</label>
+              <!-- Address input + scan button in a row -->
+              <div class="addr-input-row">
+                <input type="text" class="form-input" id="sendTo" placeholder="0x… (64 hex chars)" autocomplete="off"/>
+                <button class="qr-scan-btn" id="openScanQR" title="Scan QR code">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <!-- QR icon -->
+                    <rect x="3" y="3" width="7" height="7" rx="1"/>
+                    <rect x="14" y="3" width="7" height="7" rx="1"/>
+                    <rect x="3" y="14" width="7" height="7" rx="1"/>
+                    <rect x="5" y="5" width="3" height="3" fill="currentColor" stroke="none"/>
+                    <rect x="16" y="5" width="3" height="3" fill="currentColor" stroke="none"/>
+                    <rect x="5" y="16" width="3" height="3" fill="currentColor" stroke="none"/>
+                    <rect x="14" y="14" width="3" height="3"/>
+                    <rect x="18" y="18" width="3" height="3"/>
+                    <rect x="14" y="18" width="3" height="3"/>
+                    <rect x="18" y="14" width="3" height="3"/>
+                  </svg>
+                  Scan
+                </button>
+              </div>
+            </div>
+            <div class="form-group" style="margin-top:1rem">
+              <label class="form-label">Amount (ALE)</label>
+              <input type="number" class="form-input" id="sendAmount" placeholder="0.0000" step="any" min="0"/>
+            </div>
+            <button class="btn-primary full-width mt-md" id="sendBtn">
+              <span class="btn-text">Send</span>
+              <span class="btn-loading" style="display:none">Submitting…</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="card" id="jar-action-card" style="display:none">
+          <div class="card-header">
+            <span class="card-title">Jar Node Actions</span>
+          </div>
+          <div class="card-body">
+            <p class="card-desc">Distribute your liquid balance across random jar nodes in 25% chunks — or reclaim them all back.</p>
+            <button class="btn-primary full-width mt-md" id="distributeBtn">Distribute to Jar Nodes</button>
+            <button class="btn-ghost   full-width mt-sm" id="autoReclaimBtn">Reclaim All Chunks</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════ TRANSACTIONS ══════ -->
+    <section class="page" id="page-transactions">
+      <div class="page-header">
+        <h1 class="page-title">Transactions</h1>
+        <p class="page-sub">Pending and confirmed activity</p>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Activity</span>
+          <span class="card-action" id="refresh-tx-btn">↻ Refresh</span>
+        </div>
+        <div class="card-body" id="txHistoryList">
+          <div class="empty-state"><p>No transactions yet.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════ BLOCKCHAIN ══════ -->
+    <section class="page" id="page-blockchain">
+      <div class="page-header">
+        <h1 class="page-title">Blockchain</h1>
+        <p class="page-sub">Immutable ledger of all mined blocks</p>
+      </div>
+
+      <div class="stats-grid four" style="margin-bottom:2.4rem">
+        <div class="stat-card">
+          <div class="stat-label">Chain Height</div>
+          <div class="stat-value acid" id="bc-height">—</div>
+          <div class="stat-sub">blocks</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Minted</div>
+          <div class="stat-value" id="bc-minted">—</div>
+          <div class="stat-sub">ALE in supply</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Remaining</div>
+          <div class="stat-value" id="bc-remaining">—</div>
+          <div class="stat-sub">ALE mintable</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Next Reward</div>
+          <div class="stat-value" id="bc-reward">10</div>
+          <div class="stat-sub">ALE / block</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Block Explorer</span>
+          <span class="card-action" id="refreshBlocksBtn">↻ Refresh</span>
+        </div>
+        <div class="card-body" id="blockListContainer">
+          <div class="empty-state"><p>No blocks mined yet.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════ JAR NODES ══════ -->
+    <section class="page" id="page-jarnodes">
+      <div class="page-header">
+        <h1 class="page-title">Jar Nodes</h1>
+        <p class="page-sub">Distributed chunk storage across the network</p>
+      </div>
+
+      <div class="card" style="margin-bottom:1.6rem">
+        <div class="card-header">
+          <span class="card-title">Your Node</span>
+          <span class="card-action" id="refreshNodesBtn">↻ Sync</span>
+        </div>
+        <div class="card-body" id="jarNodeGrid">
+          <div class="empty-state"><p>Loading…</p></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Network Peers</span>
+          <span class="card-badge-count" id="peer-count">0 active</span>
+        </div>
+        <div class="card-body" id="peerGrid">
+          <div class="empty-state"><p>No other jar nodes on the network.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════ VALIDATOR ══════ -->
+    <section class="page" id="page-validator">
+      <div class="page-header">
+        <h1 class="page-title">Validator</h1>
+        <p class="page-sub">Review · Approve · Mine</p>
+      </div>
+
+      <div id="gateScreen">
+        <div class="card">
+          <div class="card-body gate-body">
+            <div class="gate-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            </div>
+            <h3 class="gate-title">Become a Validator</h3>
+            <p class="gate-desc">
+              Validators review pending transactions and trigger block mining.
+              Each block you mine earns your wallet
+              <strong class="acid">10 ALE</strong>
+              (subject to halving schedule and the 21M supply cap).
+            </p>
+            <button class="btn-primary mt-lg" id="becomeValidatorBtn" style="min-width:200px">
+              <span class="btn-text">Activate Validator</span>
+              <span class="btn-loading" style="display:none">Activating…</span>
+            </button>
+            <p id="becomeStatus" class="gate-status"></p>
+          </div>
+        </div>
+      </div>
+
+      <div id="dashScreen" style="display:none">
+        <div class="val-badge-row">
+          <span class="val-active-badge">validator · active</span>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Pending Transactions</span>
+            <span class="card-badge-count" id="pending-count">0 waiting</span>
+          </div>
+          <div class="card-body" id="pendingList">
+            <div class="empty-state"><p>No transactions awaiting approval.</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════ MARKET ══════ -->
+    <section class="page" id="page-market">
+      <div class="page-header">
+        <h1 class="page-title">Market</h1>
+        <p class="page-sub">ALETHEA / ETH · simulated price feed</p>
+      </div>
+
+      <div class="stats-grid four" style="margin-bottom:2.4rem">
+        <div class="stat-card">
+          <div class="stat-label">Price</div>
+          <div class="stat-value acid" id="marketPrice">$0.0000</div>
+          <div class="stat-sub">ALE / ETH</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">24h Change</div>
+          <div class="stat-value" id="priceChange">+0.00%</div>
+          <div class="stat-sub">vs yesterday</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Volume</div>
+          <div class="stat-value" id="volume">$124.5K</div>
+          <div class="stat-sub">24h</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Market Cap</div>
+          <div class="stat-value" id="marketCap">$2.84M</div>
+          <div class="stat-sub">circulating</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Price Chart</span>
+          <span style="font-size:0.62rem;color:var(--acid)">live · 12s updates</span>
+        </div>
+        <div class="card-body chart-pad">
+          <canvas id="priceChart" height="220"></canvas>
+        </div>
+        <div class="card-note">live simulated price · Alethea mainnet</div>
+      </div>
+    </section>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- ════════════════════════════════════════════════════════════
+     QR SCAN MODAL  —  scan a QR code to fill recipient address
+════════════════════════════════════════════════════════════ -->
+<div class="qr-overlay" id="qr-scan-overlay">
+  <div class="qr-modal">
+    <button class="qr-close" id="closeScanQR" title="Close">✕</button>
+    <div class="qr-modal-title">Scan Recipient Address</div>
+
+    <div class="qr-scanner-wrap">
+      <video id="qr-video" playsinline muted></video>
+      <canvas id="qr-canvas"></canvas>
+      <div class="qr-scan-line"></div>
+      <div class="qr-corner tl"></div>
+      <div class="qr-corner tr"></div>
+      <div class="qr-corner bl"></div>
+      <div class="qr-corner br"></div>
+    </div>
+
+    <div class="qr-status" id="qr-scan-status">Align QR code within the frame</div>
+    <div class="qr-hint">Point your camera at the recipient's QR code.<br/>Detection is automatic.</div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     QR RECEIVE MODAL  —  show your address as a QR code
+════════════════════════════════════════════════════════════ -->
+<div class="qr-overlay" id="qr-receive-overlay">
+  <div class="qr-modal">
+    <button class="qr-close" id="closeReceiveQR" title="Close">✕</button>
+    <div class="qr-modal-title">Your Wallet Address</div>
+
+    <!-- QR code rendered here by qrcode.js -->
+    <div class="qr-code-wrap">
+      <div id="qr-receive-canvas"></div>
+    </div>
+
+    <div class="qr-addr-display" id="qr-receive-addr">—</div>
+    <button class="qr-addr-copy" id="qr-receive-copy">Copy Address</button>
+    <div class="qr-hint">Have another user scan this code to send ALE to your wallet.</div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toastMsg" class="toast"></div>
+
+<!-- ════════════════════════════════════════════════════════════
+     SPLASH ANIMATION (no Firebase dependency — runs immediately)
+════════════════════════════════════════════════════════════ -->
+<script>
+(function() {
+  const wrapper = document.getElementById('splash-wordmark');
+  const rule    = document.getElementById('splash-rule');
+  const tagline = document.getElementById('splash-tagline');
+
+  ['A','L','E','·','T','H','E','A'].forEach((ch, i) => {
+    const span = document.createElement('span');
+    span.className   = 'splash-letter' + (ch === '·' ? ' accent' : '');
+    span.textContent = ch;
+    span.style.transitionDelay = (i * 0.07) + 's';
+    wrapper.appendChild(span);
+  });
+
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      wrapper.querySelectorAll('.splash-letter').forEach(l => l.classList.add('in'));
+    }, 100);
+    setTimeout(() => { rule.classList.add('in');    }, 550);
+    setTimeout(() => { tagline.classList.add('in'); }, 750);
+  });
+})();
+</script>
+
+<!-- ════════════════════════════════════════════════════════════
+     QR FUNCTIONALITY
+     Self-contained — no module imports needed.
+     Exposes window.aletheaQR for app.js to call once wallet
+     address is known.
+════════════════════════════════════════════════════════════ -->
+<script>
+(function() {
+
+  // ── Internal state ────────────────────────────────────────────
+  let _scanStream        = null;   // active MediaStream
+  let _scanAnimFrame     = null;   // requestAnimationFrame handle
+  let _barcodeDetector   = null;   // native BarcodeDetector if available
+  let _onScanSuccess     = null;   // callback when a QR is decoded
+  let _receiveQrInstance = null;   // qrcode.js QRCode instance
+
+  // ── Toast helper (mirrors app.js toast) ───────────────────────
+  function _toast(msg, isError) {
+    const el = document.getElementById('toastMsg');
+    if (!el) return;
+    el.textContent      = msg;
+    el.style.background = isError ? 'rgba(224,85,85,0.15)' : 'rgba(200,255,0,0.08)';
+    el.style.borderLeft = `3px solid ${isError ? '#e05555' : '#c8ff00'}`;
+    el.style.display    = 'block';
+    clearTimeout(el._t);
+    el._t = setTimeout(() => { el.style.display = 'none'; }, 5000);
+  }
+
+  // ── Stop camera and clean up animation loop ───────────────────
+  function _stopCamera() {
+    if (_scanAnimFrame)  { cancelAnimationFrame(_scanAnimFrame); _scanAnimFrame = null; }
+    if (_scanStream)     {
+      _scanStream.getTracks().forEach(t => t.stop());
+      _scanStream = null;
+    }
+    const video = document.getElementById('qr-video');
+    if (video) { video.srcObject = null; }
+  }
+
+  // ── Open scan modal ───────────────────────────────────────────
+  async function openScanner(onSuccess) {
+    _onScanSuccess = onSuccess;
+    const overlay  = document.getElementById('qr-scan-overlay');
+    const statusEl = document.getElementById('qr-scan-status');
+    const video    = document.getElementById('qr-video');
+
+    overlay.classList.add('open');
+    statusEl.textContent = 'Starting camera…';
+    statusEl.style.color = 'var(--text-3)';
+
+    // Request rear camera — exact: false allows fallback to front
+    try {
+      _scanStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: 'environment' },
+          width:  { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      });
+    } catch (err) {
+      statusEl.textContent = 'Camera access denied.';
+      statusEl.style.color = 'var(--red, #e05555)';
+      _toast('Camera permission denied. Allow camera access and try again.', true);
+      return;
+    }
+
+    video.srcObject = _scanStream;
+    await video.play();
+    statusEl.textContent = 'Align QR code within the frame';
+    statusEl.style.color = 'var(--text-3)';
+
+    // Prefer native BarcodeDetector (fast, hardware-accelerated on Android Chrome)
+    if ('BarcodeDetector' in window) {
+      try {
+        _barcodeDetector = new BarcodeDetector({ formats: ['qr_code'] });
+      } catch { _barcodeDetector = null; }
+    }
+
+    _scanLoop(video, statusEl);
+  }
+
+  // ── Continuous scan loop ──────────────────────────────────────
+  function _scanLoop(video, statusEl) {
+    if (!_scanStream) return;
+
+    _scanAnimFrame = requestAnimationFrame(async () => {
+      if (video.readyState < video.HAVE_ENOUGH_DATA) {
+        _scanLoop(video, statusEl);
+        return;
+      }
+
+      let result = null;
+
+      if (_barcodeDetector) {
+        // Native path — fastest
+        try {
+          const codes = await _barcodeDetector.detect(video);
+          if (codes.length > 0) result = codes[0].rawValue;
+        } catch { /* ignore detection errors, keep looping */ }
+      } else {
+        // jsQR fallback — draw frame to hidden canvas, then analyse
+        const canvas = document.getElementById('qr-canvas');
+        const ctx    = canvas.getContext('2d');
+        canvas.width  = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const decoded = jsQR(imgData.data, imgData.width, imgData.height, {
+          inversionAttempts: 'dontInvert'
+        });
+        if (decoded) result = decoded.data;
+      }
+
+      if (result) {
+        // Validate — must look like a wallet address or extract one
+        const address = _extractAddress(result);
+        if (address) {
+          _onScanSuccess(address);
+          closeScanner();
+          return;
+        }
+        // Valid QR but not a wallet address — show hint, keep scanning
+        statusEl.textContent = 'Not a valid wallet address — keep scanning';
+        statusEl.style.color = '#e05555';
+      }
+
+      _scanLoop(video, statusEl);
+    });
+  }
+
+  // ── Extract a 0x + 64 hex wallet address from scanned text ───
+  // Supports bare addresses, URIs like alethea:0x..., amounts etc.
+  function _extractAddress(raw) {
+    if (!raw) return null;
+    // Direct match
+    const direct = raw.match(/0x[a-fA-F0-9]{64}/);
+    return direct ? direct[0] : null;
+  }
+
+  // ── Close scan modal ──────────────────────────────────────────
+  function closeScanner() {
+    _stopCamera();
+    document.getElementById('qr-scan-overlay').classList.remove('open');
+    document.getElementById('qr-scan-status').textContent = 'Align QR code within the frame';
+    document.getElementById('qr-scan-status').style.color = 'var(--text-3)';
+  }
+
+  // ── Open receive modal ────────────────────────────────────────
+  function openReceive(walletAddress) {
+    if (!walletAddress) {
+      _toast('Wallet address not loaded yet.', true);
+      return;
+    }
+
+    const overlay  = document.getElementById('qr-receive-overlay');
+    const addrEl   = document.getElementById('qr-receive-addr');
+    const canvasEl = document.getElementById('qr-receive-canvas');
+
+    addrEl.textContent = walletAddress;
+    overlay.classList.add('open');
+
+    // Clear previous QR and generate a new one
+    canvasEl.innerHTML = '';
+    // qrcode.js renders into the container div
+    try {
+      _receiveQrInstance = new QRCode(canvasEl, {
+        text:         walletAddress,
+        width:        220,
+        height:       220,
+        colorDark:    '#000000',
+        colorLight:   '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    } catch (err) {
+      canvasEl.innerHTML =
+        '<div style="color:#e05555;font-size:0.68rem;text-align:center;padding:1rem">QR generation failed</div>';
+    }
+  }
+
+  // ── Close receive modal ───────────────────────────────────────
+  function closeReceive() {
+    document.getElementById('qr-receive-overlay').classList.remove('open');
+    // Clean up the QR instance so next open regenerates cleanly
+    _receiveQrInstance = null;
+  }
+
+  // ── Copy address from receive modal ──────────────────────────
+  document.getElementById('qr-receive-copy').addEventListener('click', () => {
+    const addr = document.getElementById('qr-receive-addr').textContent;
+    if (!addr || addr === '—') return;
+    navigator.clipboard.writeText(addr).then(() => {
+      const btn  = document.getElementById('qr-receive-copy');
+      const orig = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.textContent = orig; }, 1500);
+    });
+  });
+
+  // ── Close buttons ─────────────────────────────────────────────
+  document.getElementById('closeScanQR').addEventListener('click',    closeScanner);
+  document.getElementById('closeReceiveQR').addEventListener('click', closeReceive);
+
+  // Close on backdrop click (clicking the overlay outside the modal)
+  document.getElementById('qr-scan-overlay').addEventListener('click', function(e) {
+    if (e.target === this) closeScanner();
+  });
+  document.getElementById('qr-receive-overlay').addEventListener('click', function(e) {
+    if (e.target === this) closeReceive();
+  });
+
+  // ── Trigger: scan button (fills #sendTo) ─────────────────────
+  document.getElementById('openScanQR').addEventListener('click', () => {
+    openScanner((address) => {
+      const input = document.getElementById('sendTo');
+      if (input) {
+        input.value = address;
+        // Fire an input event so any listeners on the field react
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        _toast(`Address scanned: ${address.slice(0,10)}…${address.slice(-6)}`, false);
+      }
+    });
+  });
+
+  // ── Trigger: receive button ───────────────────────────────────
+  document.getElementById('openReceiveQR').addEventListener('click', () => {
+    // Try to get current wallet address from the display element
+    // (app.js sets this once the wallet is loaded)
+    const shortEl  = document.getElementById('walletAddressShort');
+    const toastEl  = document.getElementById('toastMsg');
+
+    // Prefer the full address stored by app.js on window
+    const fullAddr = window._aletheaWalletAddress || null;
+
+    if (fullAddr) {
+      openReceive(fullAddr);
+    } else {
+      _toast('Wallet not loaded yet. Please wait.', true);
+    }
+  });
+
+  // ── Public API for app.js to register the wallet address ─────
+  // app.js calls window.aletheaQR.setAddress(addr) once it has
+  // the full wallet address so the receive modal can use it.
+  window.aletheaQR = {
+    setAddress: function(addr) {
+      window._aletheaWalletAddress = addr;
+    },
+    openScanner,
+    openReceive,
+    closeScanner,
+    closeReceive
+  };
+
+})();
+</script>
+
+<!-- Module scripts — auth.js is the single router -->
+<script type="module" src="core.js"></script>
+<script type="module" src="ui.js"></script>
+
+</body>
+</html>
